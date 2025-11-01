@@ -77,7 +77,7 @@ class GenState {
     }
 
     public String next(AbstractJarEntry entry, String name) {
-        return name + "_0_" + values.computeIfAbsent(entry, (e) -> {
+        return name + "_" + values.computeIfAbsent(entry, (e) -> {
             int v = counters.getOrDefault(name, 1);
             counters.put(name, v + 1);
             return v;
