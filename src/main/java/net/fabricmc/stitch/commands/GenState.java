@@ -45,13 +45,16 @@ class GenState {
     private Scanner scanner = new Scanner(System.in);
 
     private String targetNamespace = "net/minecraft/";
-    private final List<Pattern> obfuscatedPatterns = new ArrayList<Pattern>();
+    private final List<Pattern> nonObfuscatedPatterns = new ArrayList<Pattern>();
 
     private final List<Integer> conflictChoices = new ArrayList<>();
 
     public GenState() {
-        // Default obfuscation. Minecraft classes with a lowercase name are always obfuscated.
-        this.obfuscatedPatterns.add(Pattern.compile("^([a-z0-9]+|([a-zA-Z0-9]+[$])+[a-z0-9]+|(([a-zA-Z0-9]+/)+([a-z0-9]+|([a-zA-Z0-9]+[$])+[a-z0-9]+)))$"));
+//        // Default obfuscation. Minecraft classes with a lowercase name are always obfuscated.
+//        this.obfuscatedPatterns.add(Pattern.compile("^([a-z0-9]+|([a-zA-Z0-9]+[$])+[a-z0-9]+|(([a-zA-Z0-9]+/)+([a-z0-9]+|([a-zA-Z0-9]+[$])+[a-z0-9]+)))$"));
+
+        //
+        this.nonObfuscatedPatterns.add(Pattern.compile("^(com/mojang/blaze3d/buffers/GpuBuffer\\$MappedView|com/mojang/blaze3d/buffers/GpuBuffer|com/mojang/blaze3d/buffers/GpuBufferSlice|com/mojang/blaze3d/buffers/GpuFence|com/mojang/blaze3d/buffers/Std140Builder|com/mojang/blaze3d/buffers/Std140SizeCalculator|com/mojang/blaze3d/opengl/GlConst|com/mojang/blaze3d/opengl/GlStateManager|com/mojang/blaze3d/pipeline/BlendFunction|com/mojang/blaze3d/pipeline/CompiledRenderPipeline|com/mojang/blaze3d/pipeline/RenderPipeline\\$Builder|com/mojang/blaze3d/pipeline/RenderPipeline\\$Snippet|com/mojang/blaze3d/pipeline/RenderPipeline\\$UniformDescription|com/mojang/blaze3d/pipeline/RenderPipeline|com/mojang/blaze3d/platform/DepthTestFunction|com/mojang/blaze3d/platform/DestFactor|com/mojang/blaze3d/platform/GLX|com/mojang/blaze3d/platform/LogicOp|com/mojang/blaze3d/platform/PolygonMode|com/mojang/blaze3d/platform/SourceFactor|com/mojang/blaze3d/platform/TextureUtil|com/mojang/blaze3d/shaders/ShaderType|com/mojang/blaze3d/systems/CommandEncoder|com/mojang/blaze3d/systems/GpuDevice|com/mojang/blaze3d/systems/GpuQuery|com/mojang/blaze3d/systems/RenderPass|com/mojang/blaze3d/systems/RenderSystem|com/mojang/blaze3d/textures/AddressMode|com/mojang/blaze3d/textures/FilterMode|com/mojang/blaze3d/textures/GpuTexture|com/mojang/blaze3d/textures/GpuTextureView|com/mojang/blaze3d/textures/TextureFormat|com/mojang/blaze3d/vertex/VertexFormat\\$Builder|com/mojang/blaze3d/vertex/VertexFormat|com/mojang/blaze3d/vertex/VertexFormatElement\\$Type|com/mojang/blaze3d/vertex/VertexFormatElement\\$Usage|com/mojang/blaze3d/vertex/VertexFormatElement|net/minecraft/client/ClientBrandRetriever|net/minecraft/client/data/Main|net/minecraft/client/main/Main|net/minecraft/data/Main|net/minecraft/gametest/Main|net/minecraft/obfuscate/DontObfuscate|net/minecraft/server/Main|net/minecraft/server/MinecraftServer|net/minecraft/util/profiling/jfr/event/ChunkGenerationEvent|net/minecraft/util/profiling/jfr/event/ChunkRegionReadEvent|net/minecraft/util/profiling/jfr/event/ChunkRegionWriteEvent|net/minecraft/util/profiling/jfr/event/ClientFpsEvent|net/minecraft/util/profiling/jfr/event/NetworkSummaryEvent|net/minecraft/util/profiling/jfr/event/PacketReceivedEvent|net/minecraft/util/profiling/jfr/event/PacketSentEvent|net/minecraft/util/profiling/jfr/event/ServerTickTimeEvent|net/minecraft/util/profiling/jfr/event/StructureGenerationEvent|net/minecraft/util/profiling/jfr/event/WorldLoadFinishedEvent)$"));
     }
 
     public void setConflictChoices(String choices) {
@@ -88,12 +91,12 @@ class GenState {
             this.targetNamespace = namespace;
     }
 
-    public void clearObfuscatedPatterns() {
-        this.obfuscatedPatterns.clear();
+    public void clearNonObfuscatedPatterns() {
+        this.nonObfuscatedPatterns.clear();
     }
 
-    public void addObfuscatedPattern(String regex) throws PatternSyntaxException {
-        this.obfuscatedPatterns.add(Pattern.compile(regex));
+    public void addNonObfuscatedPattern(String regex) throws PatternSyntaxException {
+        this.nonObfuscatedPatterns.add(Pattern.compile(regex));
     }
 
     public void setCounter(String key, int value) {
@@ -372,7 +375,7 @@ class GenState {
         String cname = "";
         String prefixSaved = translatedPrefix;
 
-        if(!this.obfuscatedPatterns.stream().anyMatch(p -> p.matcher(className).matches())) {
+        if(this.nonObfuscatedPatterns.stream().anyMatch(p -> p.matcher(className).matches())) {
             translatedPrefix = c.getFullyQualifiedName();
         } else {
             if (!isMappedClass(storage, c)) {

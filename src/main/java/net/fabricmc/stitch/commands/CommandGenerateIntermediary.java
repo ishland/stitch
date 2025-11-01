@@ -29,7 +29,7 @@ public class CommandGenerateIntermediary extends Command {
 
     @Override
     public String getHelpString() {
-        return "<input-jar> <mapping-name> [-t|--target-namespace <namespace>] [-p|--obfuscation-pattern <regex pattern>]...";
+        return "<input-jar> <mapping-name> [-t|--target-namespace <namespace>] [-p|--non-obfuscation-pattern <regex pattern>]...";
     }
 
     @Override
@@ -59,12 +59,12 @@ public class CommandGenerateIntermediary extends Command {
                     i++;
                     break;
                 case "-p":
-                case "--obfuscation-pattern":
+                case "--non-obfuscation-pattern":
                     if (!clearedPatterns)
-                        state.clearObfuscatedPatterns();
+                        state.clearNonObfuscatedPatterns();
                     clearedPatterns = true;
 
-                    state.addObfuscatedPattern(args[i + 1]);
+                    state.addNonObfuscatedPattern(args[i + 1]);
                     i++;
                     break;
             }
