@@ -383,7 +383,7 @@ class GenState {
         String cname = "";
         String prefixSaved = translatedPrefix;
 
-        if(this.nonObfuscatedPatterns.stream().anyMatch(p -> p.matcher(className).matches())) {
+        if(this.nonObfuscatedPatterns.stream().anyMatch(p -> p.matcher(c.getFullyQualifiedName()).matches())) {
             translatedPrefix = c.getFullyQualifiedName();
         } else {
             if (!isMappedClass(storage, c)) {
