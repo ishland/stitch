@@ -218,6 +218,10 @@ public class JarReader {
             super(api, methodVisitor);
             this.classEntry = classEntry;
             this.entry = entry;
+            this.recordMethodMatchingState = RecordMethodMatchingState.NOT_STARTED;
+            if (!entry.desc.startsWith("()")) {
+                this.recordMethodMatchingState = RecordMethodMatchingState.FAIL;
+            }
         }
 
         private enum RecordMethodMatchingState {
@@ -230,7 +234,7 @@ public class JarReader {
             FAIL,
             ;
         }
-        RecordMethodMatchingState recordMethodMatchingState = RecordMethodMatchingState.NOT_STARTED;
+        RecordMethodMatchingState recordMethodMatchingState;
         JarRecordComponentEntry recordComponentEntry = null;
 
         private void failRecordMatching() {
