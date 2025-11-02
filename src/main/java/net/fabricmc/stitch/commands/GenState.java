@@ -78,8 +78,12 @@ class GenState {
 
     public String next(AbstractJarEntry entry, String name) {
         return name + "_" + values.computeIfAbsent(entry, (e) -> {
-            int v = counters.getOrDefault(name, 1);
-            counters.put(name, v + 1);
+            String name1 = name;
+            if (name1.equals("comp")) {
+                name1 = "component";
+            }
+            int v = counters.getOrDefault(name1, 1);
+            counters.put(name1, v + 1);
             return v;
         });
     }
@@ -528,11 +532,12 @@ class GenState {
             counterLines.add("# INTERMEDIARY-COUNTER " + counter.getKey() + " " + counter.getValue());
         }
 
-        writer.write(counterLines.toString());
         Path counterPath = getExternalCounterFile();
 
         if (counterPath != null) {
             Files.write(counterPath, counterLines.toString().getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } else {
+            writer.write(counterLines.toString());
         }
     }
 
