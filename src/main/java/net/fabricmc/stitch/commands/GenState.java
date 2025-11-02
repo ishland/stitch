@@ -144,16 +144,23 @@ class GenState {
         return !c.isAnonymous();
     }
 
-    public static boolean isMappedField(ClassStorage storage, JarClassEntry c, JarFieldEntry f) {
-        return isUnmappedFieldName(f.getName());
+    private static boolean isStandardEnumMethod(String clsName, JarMethodEntry m) {
+        final int reqFlags = Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC;
+        if ((m.getAccess() & reqFlags) != reqFlags) return false;
+
+        return m.getName().equals("values") && m.getDescriptor().startsWith("()[L") && m.getDescriptor().startsWith(clsName, 4) && m.getDescriptor().length() == clsName.length() + 5
+                || m.getName().equals("valueOf") && m.getDescriptor().startsWith("(Ljava/lang/String;)L") && m.getDescriptor().startsWith(clsName, 21) && m.getDescriptor().length() == clsName.length() + 22;
     }
 
-    public static boolean isUnmappedFieldName(String name) {
-        return name.length() <= 2 || (name.length() == 3 && name.charAt(2) == '_');
-    }
-
-    public static boolean isMappedMethod(ClassStorage storage, JarClassEntry c, JarMethodEntry m) {
-        return isUnmappedMethodName(m.getName()) && m.isSource(storage, c);
+    public boolean isObfuscatedMethod(ClassStorage storage, JarClassEntry c, JarMethodEntry m) {
+        boolean isEnum = (c.getAccess() & Opcodes.ACC_ENUM) != 0;
+        String patternInput = c.getFullyQualifiedName() + "/" + m.getKey();
+        return !m.getName().equals("<clinit>")
+                && !m.getName().equals("<init>")
+                && (!m.getName().equals("main") || !m.getDescriptor().equals("([Ljava/lang/String;)V") || m.getAccess() != (Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC))
+                && (!isEnum || !isStandardEnumMethod(c.getFullyQualifiedName(), m))
+                && m.isSource(storage, c)
+                && !this.nonObfuscatedMemberPatterns.stream().anyMatch(pattern -> pattern.matcher(patternInput).matches());
     }
 
     public static boolean isUnmappedMethodName(String name) {
@@ -166,10 +173,6 @@ class GenState {
     private String getFieldName(ClassStorage storage, JarClassEntry c, JarFieldEntry f) {
         String patternInput = c.getFullyQualifiedName() + "/" + f.getKey();
         if (this.nonObfuscatedMemberPatterns.stream().anyMatch(pattern -> pattern.matcher(patternInput).matches())) {
-            return null;
-        }
-
-        if (!isMappedField(storage, c, f)) {
             return null;
         }
 
@@ -336,12 +339,7 @@ class GenState {
 
     @Nullable
     private String getMethodName(ClassStorage storageOld, ClassStorage storageNew, JarClassEntry c, JarMethodEntry m) {
-        String patternInput = c.getFullyQualifiedName() + "/" + m.getKey();
-        if (this.nonObfuscatedMemberPatterns.stream().anyMatch(pattern -> pattern.matcher(patternInput).matches())) {
-            return null;
-        }
-
-        if (!isMappedMethod(storageNew, c, m)) {
+        if (!isObfuscatedMethod(storageNew, c, m)) {
             return null;
         }
 
