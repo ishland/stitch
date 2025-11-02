@@ -29,7 +29,17 @@ public class JarRootEntry extends AbstractJarEntry implements ClassStorage {
         super(file.getName());
 
         this.file = file;
-        this.classTree = new TreeMap<>(Comparator.naturalOrder());
+        this.classTree = new TreeMap<>(
+                Comparator
+                        .comparing((String s) -> {
+                            if (s.contains("$")) {
+                                return s.indexOf("$");
+                            } else {
+                                return s.length();
+                            }
+                        })
+                        .thenComparing(Comparator.naturalOrder())
+        );
         this.allClasses = new ArrayList<>();
     }
 
