@@ -46,6 +46,7 @@ class GenState {
 
     private String targetNamespace = "net/minecraft/";
     private final List<Pattern> nonObfuscatedPatterns = new ArrayList<Pattern>();
+    private final List<Pattern> nonObfuscatedMemberPatterns = new ArrayList<>();
 
     private final List<Integer> conflictChoices = new ArrayList<>();
 
@@ -55,6 +56,8 @@ class GenState {
 
         //
         this.nonObfuscatedPatterns.add(Pattern.compile("^(com/mojang/blaze3d/buffers/GpuBuffer\\$MappedView|com/mojang/blaze3d/buffers/GpuBuffer|com/mojang/blaze3d/buffers/GpuBufferSlice|com/mojang/blaze3d/buffers/GpuFence|com/mojang/blaze3d/buffers/Std140Builder|com/mojang/blaze3d/buffers/Std140SizeCalculator|com/mojang/blaze3d/opengl/GlConst|com/mojang/blaze3d/opengl/GlStateManager|com/mojang/blaze3d/pipeline/BlendFunction|com/mojang/blaze3d/pipeline/CompiledRenderPipeline|com/mojang/blaze3d/pipeline/RenderPipeline\\$Builder|com/mojang/blaze3d/pipeline/RenderPipeline\\$Snippet|com/mojang/blaze3d/pipeline/RenderPipeline\\$UniformDescription|com/mojang/blaze3d/pipeline/RenderPipeline|com/mojang/blaze3d/platform/DepthTestFunction|com/mojang/blaze3d/platform/DestFactor|com/mojang/blaze3d/platform/GLX|com/mojang/blaze3d/platform/LogicOp|com/mojang/blaze3d/platform/PolygonMode|com/mojang/blaze3d/platform/SourceFactor|com/mojang/blaze3d/platform/TextureUtil|com/mojang/blaze3d/shaders/ShaderType|com/mojang/blaze3d/systems/CommandEncoder|com/mojang/blaze3d/systems/GpuDevice|com/mojang/blaze3d/systems/GpuQuery|com/mojang/blaze3d/systems/RenderPass|com/mojang/blaze3d/systems/RenderSystem|com/mojang/blaze3d/textures/AddressMode|com/mojang/blaze3d/textures/FilterMode|com/mojang/blaze3d/textures/GpuTexture|com/mojang/blaze3d/textures/GpuTextureView|com/mojang/blaze3d/textures/TextureFormat|com/mojang/blaze3d/vertex/VertexFormat\\$Builder|com/mojang/blaze3d/vertex/VertexFormat|com/mojang/blaze3d/vertex/VertexFormatElement\\$Type|com/mojang/blaze3d/vertex/VertexFormatElement\\$Usage|com/mojang/blaze3d/vertex/VertexFormatElement|net/minecraft/client/ClientBrandRetriever|net/minecraft/client/data/Main|net/minecraft/client/main/Main|net/minecraft/data/Main|net/minecraft/gametest/Main|net/minecraft/obfuscate/DontObfuscate|net/minecraft/server/Main|net/minecraft/server/MinecraftServer|net/minecraft/util/profiling/jfr/event/ChunkGenerationEvent|net/minecraft/util/profiling/jfr/event/ChunkRegionReadEvent|net/minecraft/util/profiling/jfr/event/ChunkRegionWriteEvent|net/minecraft/util/profiling/jfr/event/ClientFpsEvent|net/minecraft/util/profiling/jfr/event/NetworkSummaryEvent|net/minecraft/util/profiling/jfr/event/PacketReceivedEvent|net/minecraft/util/profiling/jfr/event/PacketSentEvent|net/minecraft/util/profiling/jfr/event/ServerTickTimeEvent|net/minecraft/util/profiling/jfr/event/StructureGenerationEvent|net/minecraft/util/profiling/jfr/event/WorldLoadFinishedEvent)$"));
+
+        this.nonObfuscatedMemberPatterns.add(Pattern.compile("^(net/minecraft/client/ClientBrandRetriever/getClientModName\\(\\)Ljava/lang/String;|net/minecraft/server/MinecraftServer/getServerModName\\(\\)Ljava/lang/String;|com/mojang/blaze3d/buffers/GpuBuffer\\$MappedView/.*|com/mojang/blaze3d/buffers/GpuBuffer/.*|com/mojang/blaze3d/buffers/GpuBufferSlice/.*|com/mojang/blaze3d/buffers/GpuFence/.*|com/mojang/blaze3d/buffers/Std140Builder/.*|com/mojang/blaze3d/buffers/Std140SizeCalculator/.*|com/mojang/blaze3d/opengl/GlConst/.*|com/mojang/blaze3d/opengl/GlStateManager/.*|com/mojang/blaze3d/pipeline/BlendFunction/.*|com/mojang/blaze3d/pipeline/CompiledRenderPipeline/.*|com/mojang/blaze3d/pipeline/RenderPipeline\\$Builder/.*|com/mojang/blaze3d/pipeline/RenderPipeline\\$Snippet/.*|com/mojang/blaze3d/pipeline/RenderPipeline\\$UniformDescription/.*|com/mojang/blaze3d/pipeline/RenderPipeline/.*|com/mojang/blaze3d/platform/DepthTestFunction/.*|com/mojang/blaze3d/platform/DestFactor/.*|com/mojang/blaze3d/platform/GLX/.*|com/mojang/blaze3d/platform/LogicOp/.*|com/mojang/blaze3d/platform/PolygonMode/.*|com/mojang/blaze3d/platform/SourceFactor/.*|com/mojang/blaze3d/platform/TextureUtil/.*|com/mojang/blaze3d/shaders/ShaderType/.*|com/mojang/blaze3d/systems/CommandEncoder/.*|com/mojang/blaze3d/systems/GpuDevice/.*|com/mojang/blaze3d/systems/GpuQuery/.*|com/mojang/blaze3d/systems/RenderPass/.*|com/mojang/blaze3d/systems/RenderSystem/.*|com/mojang/blaze3d/textures/AddressMode/.*|com/mojang/blaze3d/textures/FilterMode/.*|com/mojang/blaze3d/textures/GpuTexture/.*|com/mojang/blaze3d/textures/GpuTextureView/.*|com/mojang/blaze3d/textures/TextureFormat/.*|com/mojang/blaze3d/vertex/VertexFormat\\$Builder/.*|com/mojang/blaze3d/vertex/VertexFormat/.*|com/mojang/blaze3d/vertex/VertexFormatElement\\$Type/.*|com/mojang/blaze3d/vertex/VertexFormatElement\\$Usage/.*|com/mojang/blaze3d/vertex/VertexFormatElement/.*|net/minecraft/obfuscate/DontObfuscate/.*|net/minecraft/util/profiling/jfr/event/ChunkGenerationEvent/.*|net/minecraft/util/profiling/jfr/event/ChunkRegionReadEvent/.*|net/minecraft/util/profiling/jfr/event/ChunkRegionWriteEvent/.*|net/minecraft/util/profiling/jfr/event/ClientFpsEvent/.*|net/minecraft/util/profiling/jfr/event/NetworkSummaryEvent/.*|net/minecraft/util/profiling/jfr/event/PacketReceivedEvent/.*|net/minecraft/util/profiling/jfr/event/PacketSentEvent/.*|net/minecraft/util/profiling/jfr/event/ServerTickTimeEvent/.*|net/minecraft/util/profiling/jfr/event/StructureGenerationEvent/.*|net/minecraft/util/profiling/jfr/event/WorldLoadFinishedEvent/.*)$"));
     }
 
     public void setConflictChoices(String choices) {
@@ -161,6 +164,11 @@ class GenState {
 
     @Nullable
     private String getFieldName(ClassStorage storage, JarClassEntry c, JarFieldEntry f) {
+        String patternInput = c.getFullyQualifiedName() + "/" + f.getKey();
+        if (this.nonObfuscatedMemberPatterns.stream().anyMatch(pattern -> pattern.matcher(patternInput).matches())) {
+            return null;
+        }
+
         if (!isMappedField(storage, c, f)) {
             return null;
         }
@@ -328,6 +336,11 @@ class GenState {
 
     @Nullable
     private String getMethodName(ClassStorage storageOld, ClassStorage storageNew, JarClassEntry c, JarMethodEntry m) {
+        String patternInput = c.getFullyQualifiedName() + "/" + m.getKey();
+        if (this.nonObfuscatedMemberPatterns.stream().anyMatch(pattern -> pattern.matcher(patternInput).matches())) {
+            return null;
+        }
+
         if (!isMappedMethod(storageNew, c, m)) {
             return null;
         }
