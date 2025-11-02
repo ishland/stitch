@@ -21,6 +21,7 @@ import org.objectweb.asm.commons.Remapper;
 public class JarFieldEntry extends AbstractJarEntry {
     protected String desc;
     protected String signature;
+    protected JarRecordComponentEntry recordComponent;
 
     JarFieldEntry(int access, String name, String desc, String signature) {
         super(name);

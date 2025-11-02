@@ -82,6 +82,7 @@ public class JarReader {
                                        final String signature, final Object value) {
             JarFieldEntry field = new JarFieldEntry(access, name, descriptor, signature);
             this.entry.fields.put(field.getKey(), field);
+            field.recordComponent = this.entry.getRecordComponent(field.getKey());
 
             return new VisitorField(api, super.visitField(access, name, descriptor, signature, value),
                     entry, field);
@@ -294,7 +295,7 @@ public class JarReader {
         @Override
         public void visitEnd() {
             if (recordMethodMatchingState == RecordMethodMatchingState.SUCCESS) {
-                this.entry.isRecordComponentGetter = this.recordComponentEntry != null;
+                this.entry.recordComponent = this.recordComponentEntry;
             }
             super.visitEnd();
         }
@@ -464,7 +465,11 @@ public class JarReader {
                                 JarMethodEntry value = key.getMethod(m.getKey());
                                 if (value != m) {
                                     key.methods.put(m.getKey(), m);
-                                    m.isRecordComponentGetter |= value.isRecordComponentGetter();
+                                    if (m.recordComponent == null) {
+                                        m.recordComponent = value.recordComponent;
+                                    } else {
+                                        System.out.println(String.format("Merging %s/%s into %s/%s", key.getFullyQualifiedName(), value.getKey(), c.getFullyQualifiedName(), m.getKey()));
+                                    }
                                     joinedMethods++;
                                 }
                             }

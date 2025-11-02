@@ -157,20 +157,33 @@ class GenState {
        return (name.length() <= 2 || (name.length() == 3 && name.charAt(2) == '_')) && name.charAt(0) != '<';
     }
 
+    private final Map<JarRecordComponentEntry, String> recordComponentNames = new IdentityHashMap<>();
+
     @Nullable
     private String getFieldName(ClassStorage storage, JarClassEntry c, JarFieldEntry f) {
         if (!isMappedField(storage, c, f)) {
             return null;
         }
 
+        JarRecordComponentEntry recordComponent = c.getRecordComponent(f.getKey());
+        if (recordComponentNames.containsKey(recordComponent)) {
+            return recordComponentNames.get(recordComponent);
+        }
+
         if (newToIntermediary != null) {
             EntryTriple findEntry = newToIntermediary.getField(c.getFullyQualifiedName(), f.getName(), f.getDescriptor());
             if (findEntry != null) {
-                boolean promoteRecordComponent = c.getRecordComponent(f.getKey()) != null;
+                boolean promoteRecordComponent = recordComponent != null;
                 if (findEntry.getName().startsWith("field_") || (promoteRecordComponent && findEntry.getName().startsWith("comp_"))) {
+                    if (promoteRecordComponent) {
+                        this.recordComponentNames.put(recordComponent, findEntry.getName());
+                    }
                     return findEntry.getName();
                 } else {
                     String newName = next(f, promoteRecordComponent ? "comp" : "field");
+                    if (promoteRecordComponent) {
+                        this.recordComponentNames.put(recordComponent, newName);
+                    }
                     System.out.println(findEntry.getName() + " is now " + newName);
                     return newName;
                 }
@@ -182,11 +195,17 @@ class GenState {
             if (findEntry != null) {
                 findEntry = oldToIntermediary.getField(findEntry);
                 if (findEntry != null) {
-                    boolean promoteRecordComponent = c.getRecordComponent(f.getKey()) != null;
+                    boolean promoteRecordComponent = recordComponent != null;
                     if (findEntry.getName().startsWith("field_") || (promoteRecordComponent && findEntry.getName().startsWith("comp_"))) {
+                        if (promoteRecordComponent) {
+                            this.recordComponentNames.put(recordComponent, findEntry.getName());
+                        }
                         return findEntry.getName();
                     } else {
                         String newName = next(f, promoteRecordComponent ? "comp" : "field");
+                        if (promoteRecordComponent) {
+                            this.recordComponentNames.put(recordComponent, newName);
+                        }
                         System.out.println(findEntry.getName() + " is now " + newName);
                         return newName;
                     }
@@ -194,7 +213,12 @@ class GenState {
             }
         }
 
-        return next(f, "field");
+        boolean promoteRecordComponent = recordComponent != null;
+        String newName = next(f, promoteRecordComponent ? "comp" : "field");
+        if (promoteRecordComponent) {
+            recordComponentNames.put(recordComponent, newName);
+        }
+        return newName;
     }
 
     private final Map<JarMethodEntry, String> methodNames = new IdentityHashMap<>();
@@ -312,6 +336,11 @@ class GenState {
             return methodNames.get(m);
         }
 
+        JarRecordComponentEntry recordComponent = m.getRecordComponent();
+        if (recordComponentNames.containsKey(recordComponent)) {
+            return recordComponentNames.get(recordComponent);
+        }
+
         if (newToOld != null || newToIntermediary != null) {
             Map<String, Set<String>> names = new HashMap<>();
             Set<JarMethodEntry> allEntries = findNames(storageOld, storageNew, c, m, names);
@@ -363,19 +392,29 @@ class GenState {
                 for (JarMethodEntry mm : allEntries) {
                     methodNames.put(mm, s);
                 }
-                boolean promoteRecordComponent = m.isRecordComponentGetter();
+                boolean promoteRecordComponent = recordComponent != null;
                 if (s.startsWith("method_") || (promoteRecordComponent && s.startsWith("comp_"))) {
+                    if (promoteRecordComponent) {
+                        recordComponentNames.put(recordComponent, s);
+                    }
                     return s;
                 } else {
                     String newName = next(m, promoteRecordComponent ? "comp" : "method");
+                    if (promoteRecordComponent) {
+                        recordComponentNames.put(recordComponent, newName);
+                    }
                     System.out.println(s + " is now " + newName);
                     return newName;
                 }
             }
         }
 
-        boolean promoteRecordComponent = m.isRecordComponentGetter();
-        return next(m, promoteRecordComponent ? "comp" : "method");
+        boolean promoteRecordComponent = recordComponent != null;
+        String newName = next(m, promoteRecordComponent ? "comp" : "method");
+        if (promoteRecordComponent) {
+            recordComponentNames.put(recordComponent, newName);
+        }
+        return newName;
     }
 
     private void addClass(BufferedWriter writer, JarClassEntry c, ClassStorage storageOld, ClassStorage storage, String translatedPrefix) throws IOException {
