@@ -430,7 +430,10 @@ class GenState {
             }
         }
 
-        writer.write("CLASS\t" + c.getFullyQualifiedName() + "\t" + translatedPrefix + cname + "\n");
+        String newClassName = translatedPrefix + cname;
+        if (!c.getFullyQualifiedName().equals(newClassName)) {
+            writer.write("CLASS\t" + c.getFullyQualifiedName() + "\t" + newClassName + "\n");
+        }
 
         for (JarFieldEntry f : c.getFields()) {
             String fName = getFieldName(storage, c, f);
@@ -438,7 +441,7 @@ class GenState {
                 fName = f.getName();
             }
 
-            if (fName != null) {
+            if (fName != null && !f.getName().equals(fName)) {
                 writer.write("FIELD\t" + c.getFullyQualifiedName()
                         + "\t" + f.getDescriptor()
                         + "\t" + f.getName()
@@ -454,7 +457,7 @@ class GenState {
                 }
             }
 
-            if (mName != null) {
+            if (mName != null && !m.getName().equals(mName)) {
                 writer.write("METHOD\t" + c.getFullyQualifiedName()
                         + "\t" + m.getDescriptor()
                         + "\t" + m.getName()
