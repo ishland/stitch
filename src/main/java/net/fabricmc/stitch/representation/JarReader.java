@@ -244,6 +244,10 @@ public class JarReader {
         @Override
         public void visitCode() {
             super.visitCode();
+            if (recordMethodMatchingState != RecordMethodMatchingState.NOT_STARTED) {
+                failRecordMatching();
+                return;
+            }
             recordMethodMatchingState = RecordMethodMatchingState.INIT;
         }
 
