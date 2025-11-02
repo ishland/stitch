@@ -26,6 +26,7 @@ public class JarClassEntry extends AbstractJarEntry {
     String fullyQualifiedName;
     final Map<String, JarClassEntry> innerClasses;
     final Map<String, JarFieldEntry> fields;
+    final Map<String, JarRecordComponentEntry> recordComponents;
     final Map<String, JarMethodEntry> methods;
     final Map<String, Set<Pair<JarClassEntry, String>>> relatedMethods;
 
@@ -41,6 +42,7 @@ public class JarClassEntry extends AbstractJarEntry {
         this.fullyQualifiedName = fullyQualifiedName;
         this.innerClasses = new TreeMap<>(Comparator.naturalOrder());
         this.fields = new TreeMap<>(Comparator.naturalOrder());
+        this.recordComponents = new TreeMap<>(Comparator.naturalOrder());
         this.methods = new TreeMap<>(Comparator.naturalOrder());
         this.relatedMethods = new HashMap<>();
 
@@ -133,6 +135,10 @@ public class JarClassEntry extends AbstractJarEntry {
         return fields.get(name);
     }
 
+    public JarRecordComponentEntry getRecordComponent(String name) {
+        return recordComponents.get(name);
+    }
+
     public JarMethodEntry getMethod(String name) {
         return methods.get(name);
     }
@@ -143,6 +149,10 @@ public class JarClassEntry extends AbstractJarEntry {
 
     public Collection<JarFieldEntry> getFields() {
         return fields.values();
+    }
+
+    public Collection<JarRecordComponentEntry> getRecordComponents() {
+        return recordComponents.values();
     }
 
     public Collection<JarMethodEntry> getMethods() {
@@ -178,11 +188,13 @@ public class JarClassEntry extends AbstractJarEntry {
 
         Map<String, JarClassEntry> innerClassOld = new HashMap<>(innerClasses);
         Map<String, JarFieldEntry> fieldsOld = new HashMap<>(fields);
+        Map<String, JarRecordComponentEntry> recordComponentsOld = new HashMap<>(recordComponents);
         Map<String, JarMethodEntry> methodsOld = new HashMap<>(methods);
         Map<String, String> methodKeyRemaps = new HashMap<>();
 
         innerClasses.clear();
         fields.clear();
+        recordComponents.clear();
         methods.clear();
 
         for (Map.Entry<String, JarClassEntry> entry : innerClassOld.entrySet()) {
@@ -193,6 +205,11 @@ public class JarClassEntry extends AbstractJarEntry {
         for (Map.Entry<String, JarFieldEntry> entry : fieldsOld.entrySet()) {
             entry.getValue().remap(this, oldName, remapper);
             fields.put(entry.getValue().getKey(), entry.getValue());
+        }
+
+        for (Map.Entry<String, JarRecordComponentEntry> entry : recordComponentsOld.entrySet()) {
+            entry.getValue().remap(this, oldName, remapper);
+            recordComponents.put(entry.getValue().getKey(), entry.getValue());
         }
 
         for (Map.Entry<String, JarMethodEntry> entry : methodsOld.entrySet()) {

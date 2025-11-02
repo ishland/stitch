@@ -19,6 +19,7 @@ package net.fabricmc.stitch.representation;
 import net.fabricmc.stitch.util.StitchUtil;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.Remapper;
+import org.objectweb.asm.tree.MethodNode;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -95,6 +96,14 @@ public class JarReader {
             return new VisitorMethod(api, super.visitMethod(access, name, descriptor, signature, exceptions),
                     entry, method);
         }
+
+        @Override
+        public RecordComponentVisitor visitRecordComponent(String name, String descriptor, String signature) {
+            JarRecordComponentEntry recordComponent = new JarRecordComponentEntry(name, descriptor, signature);
+            this.entry.recordComponents.put(recordComponent.getKey(), recordComponent);
+
+            return new VisitorRecordComponent(api, super.visitRecordComponent(name, descriptor, signature), entry, recordComponent);
+        }
     }
 
     private class VisitorClassStageTwo extends ClassVisitor {
@@ -136,6 +145,18 @@ public class JarReader {
             this.entry = entry;
         }
     }
+
+    private class VisitorRecordComponent extends RecordComponentVisitor {
+        private final JarClassEntry classEntry;
+        private final JarRecordComponentEntry entry;
+
+        public VisitorRecordComponent(int api, RecordComponentVisitor recordComponentVisitor, JarClassEntry classEntry, JarRecordComponentEntry entry) {
+            super(api, recordComponentVisitor);
+            this.classEntry = classEntry;
+            this.entry = entry;
+        }
+    }
+
 
     private static class MethodRef {
         final String owner, name, descriptor;
@@ -197,6 +218,190 @@ public class JarReader {
             this.classEntry = classEntry;
             this.entry = entry;
         }
+
+        private enum RecordMethodMatchingState {
+            NOT_STARTED,
+            INIT,
+            ALOAD_THIS,
+            GETFIELD_RECORD_COMP,
+            RETURN,
+            SUCCESS,
+            FAIL,
+            ;
+        }
+        RecordMethodMatchingState recordMethodMatchingState = RecordMethodMatchingState.NOT_STARTED;
+        JarRecordComponentEntry recordComponentEntry = null;
+
+        private void failRecordMatching() {
+            recordMethodMatchingState = RecordMethodMatchingState.FAIL;
+        }
+
+        @Override
+        public void visitCode() {
+            super.visitCode();
+            recordMethodMatchingState = RecordMethodMatchingState.INIT;
+        }
+
+        @Override
+        public void visitVarInsn(int opcode, int varIndex) {
+            super.visitVarInsn(opcode, varIndex);
+            if (recordMethodMatchingState != RecordMethodMatchingState.INIT) {
+                failRecordMatching();
+                return;
+            }
+            if (opcode != Opcodes.ALOAD || varIndex != 0) {
+                failRecordMatching();
+                return;
+            }
+            recordMethodMatchingState = RecordMethodMatchingState.ALOAD_THIS;
+        }
+
+        @Override
+        public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+            super.visitFieldInsn(opcode, owner, name, descriptor);
+            if (recordMethodMatchingState != RecordMethodMatchingState.ALOAD_THIS) {
+                failRecordMatching();
+                return;
+            }
+            if (opcode != Opcodes.GETFIELD || !owner.equals(this.classEntry.fullyQualifiedName)) {
+                failRecordMatching();
+                return;
+            }
+            this.recordComponentEntry = this.classEntry.getRecordComponent(name + descriptor);
+            if (this.recordComponentEntry == null) {
+                failRecordMatching();
+                return;
+            }
+            this.recordMethodMatchingState = RecordMethodMatchingState.RETURN;
+        }
+
+        @Override
+        public void visitInsn(int opcode) {
+            super.visitInsn(opcode);
+            if (recordMethodMatchingState != RecordMethodMatchingState.RETURN) {
+                failRecordMatching();
+                return;
+            }
+            if (opcode != Opcodes.ARETURN && opcode != Opcodes.DRETURN && opcode != Opcodes.IRETURN &&
+                opcode != Opcodes.FRETURN && opcode != Opcodes.LRETURN) {
+                // TODO actually check return type
+                failRecordMatching();
+                return;
+            }
+            this.recordMethodMatchingState = RecordMethodMatchingState.SUCCESS;
+        }
+
+        @Override
+        public void visitEnd() {
+            if (recordMethodMatchingState == RecordMethodMatchingState.SUCCESS) {
+                this.entry.isRecordComponentGetter = this.recordComponentEntry != null;
+            }
+            super.visitEnd();
+        }
+
+        @Override
+        public void visitFrame(int type, int numLocal, Object[] local, int numStack, Object[] stack) {
+            this.failRecordMatching();
+            super.visitFrame(type, numLocal, local, numStack, stack);
+        }
+
+        @Override
+        public void visitIntInsn(int opcode, int operand) {
+            this.failRecordMatching();
+            super.visitIntInsn(opcode, operand);
+        }
+
+        @Override
+        public void visitTypeInsn(int opcode, String type) {
+            this.failRecordMatching();
+            super.visitTypeInsn(opcode, type);
+        }
+
+        @Override
+        public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+            this.failRecordMatching();
+            super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+        }
+
+        @Override
+        public void visitInvokeDynamicInsn(String name, String descriptor, Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
+            this.failRecordMatching();
+            super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
+        }
+
+        @Override
+        public void visitJumpInsn(int opcode, Label label) {
+            this.failRecordMatching();
+            super.visitJumpInsn(opcode, label);
+        }
+
+        @Override
+        public void visitLabel(Label label) {
+            super.visitLabel(label);
+        }
+
+        @Override
+        public void visitLdcInsn(Object value) {
+            this.failRecordMatching();
+            super.visitLdcInsn(value);
+        }
+
+        @Override
+        public void visitIincInsn(int varIndex, int increment) {
+            this.failRecordMatching();
+            super.visitIincInsn(varIndex, increment);
+        }
+
+        @Override
+        public void visitTableSwitchInsn(int min, int max, Label dflt, Label... labels) {
+            this.failRecordMatching();
+            super.visitTableSwitchInsn(min, max, dflt, labels);
+        }
+
+        @Override
+        public void visitLookupSwitchInsn(Label dflt, int[] keys, Label[] labels) {
+            this.failRecordMatching();
+            super.visitLookupSwitchInsn(dflt, keys, labels);
+        }
+
+        @Override
+        public void visitMultiANewArrayInsn(String descriptor, int numDimensions) {
+            this.failRecordMatching();
+            super.visitMultiANewArrayInsn(descriptor, numDimensions);
+        }
+
+        @Override
+        public AnnotationVisitor visitInsnAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+            this.failRecordMatching();
+            return super.visitInsnAnnotation(typeRef, typePath, descriptor, visible);
+        }
+
+        @Override
+        public void visitTryCatchBlock(Label start, Label end, Label handler, String type) {
+            this.failRecordMatching();
+            super.visitTryCatchBlock(start, end, handler, type);
+        }
+
+        @Override
+        public AnnotationVisitor visitTryCatchAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+            this.failRecordMatching();
+            return super.visitTryCatchAnnotation(typeRef, typePath, descriptor, visible);
+        }
+
+        @Override
+        public void visitLocalVariable(String name, String descriptor, String signature, Label start, Label end, int index) {
+            super.visitLocalVariable(name, descriptor, signature, start, end, index);
+        }
+
+        @Override
+        public AnnotationVisitor visitLocalVariableAnnotation(int typeRef, TypePath typePath, Label[] start, Label[] end, int[] index, String descriptor, boolean visible) {
+            return super.visitLocalVariableAnnotation(typeRef, typePath, start, end, index, descriptor, visible);
+        }
+
+        @Override
+        public void visitLineNumber(int line, Label start) {
+            super.visitLineNumber(line, start);
+        }
     }
 
     public void apply() throws IOException {
@@ -212,7 +417,7 @@ public class JarReader {
 
                     ClassReader reader = new ClassReader(jarStream);
                     ClassVisitor visitor = new VisitorClass(StitchUtil.ASM_VERSION, null);
-                    reader.accept(visitor, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+                    reader.accept(visitor, ClassReader.SKIP_FRAMES);
                 }
             }
         }
@@ -259,6 +464,7 @@ public class JarReader {
                                 JarMethodEntry value = key.getMethod(m.getKey());
                                 if (value != m) {
                                     key.methods.put(m.getKey(), m);
+                                    m.isRecordComponentGetter |= value.isRecordComponentGetter();
                                     joinedMethods++;
                                 }
                             }

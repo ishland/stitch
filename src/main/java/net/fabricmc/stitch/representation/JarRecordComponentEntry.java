@@ -16,15 +16,16 @@
 
 package net.fabricmc.stitch.representation;
 
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.commons.Remapper;
 
-public class JarFieldEntry extends AbstractJarEntry {
+public class JarRecordComponentEntry extends AbstractJarEntry {
     protected String desc;
     protected String signature;
 
-    JarFieldEntry(int access, String name, String desc, String signature) {
+    JarRecordComponentEntry(String name, String desc, String signature) {
         super(name);
-        this.setAccess(access);
+        this.setAccess(Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL);
         this.desc = desc;
         this.signature = signature;
     }

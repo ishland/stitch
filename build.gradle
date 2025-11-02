@@ -5,11 +5,12 @@ plugins {
 	id "java-library"
 	id "maven-publish"
 	id 'com.diffplug.spotless' version "6.12.0"
+    id 'com.gradleup.shadow' version "9.2.2"
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 def ENV = System.getenv()
@@ -69,19 +70,24 @@ jar {
 	}
 }
 
-task allJar(type: Jar) {
-	from {
-		configurations.ship.collect {
-			it.isDirectory() ? it : zipTree(it)
-		}
-	}.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
-	manifest {
-		attributes 'Implementation-Title': 'Stitch',
-				'Implementation-Version': archiveVersion,
-				'Main-Class': "net.fabricmc.stitch.Main"
-	}
-	archiveClassifier = 'all'
-	with jar
+//task allJar(type: Jar) {
+//	from {
+//		configurations.ship.collect {
+//			it.isDirectory() ? it : zipTree(it)
+//		}
+//	}.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
+//	manifest {
+//		attributes 'Implementation-Title': 'Stitch',
+//				'Implementation-Version': archiveVersion,
+//				'Main-Class': "net.fabricmc.stitch.Main"
+//	}
+//	archiveClassifier = 'all'
+//	with jar
+//}
+
+assemble.dependsOn(shadowJar)
+shadowJar {
+    configurations = [ project.configurations.ship ]
 }
 
 java {
@@ -93,14 +99,14 @@ java {
 // see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
 tasks.withType(JavaCompile).configureEach {
 	it.options.encoding = "UTF-8"
-	if (JavaVersion.current().isJava9Compatible()) it.options.release = 8
+	if (JavaVersion.current().isJava9Compatible()) it.options.release = 17
 }
 
 publishing {
 	publications {
 		mavenJava(MavenPublication) {
 			from components.java
-			artifact(allJar)
+			artifact(shadowJar)
 		}
 	}
 

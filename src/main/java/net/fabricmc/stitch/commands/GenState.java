@@ -162,10 +162,11 @@ class GenState {
         if (newToIntermediary != null) {
             EntryTriple findEntry = newToIntermediary.getField(c.getFullyQualifiedName(), f.getName(), f.getDescriptor());
             if (findEntry != null) {
-                if (findEntry.getName().contains("field_")) {
+                boolean promoteRecordComponent = c.getRecordComponent(f.getKey()) != null;
+                if (findEntry.getName().startsWith("field_") || (promoteRecordComponent && findEntry.getName().startsWith("comp_"))) {
                     return findEntry.getName();
                 } else {
-                    String newName = next(f, "field");
+                    String newName = next(f, promoteRecordComponent ? "comp" : "field");
                     System.out.println(findEntry.getName() + " is now " + newName);
                     return newName;
                 }
@@ -177,10 +178,11 @@ class GenState {
             if (findEntry != null) {
                 findEntry = oldToIntermediary.getField(findEntry);
                 if (findEntry != null) {
-                    if (findEntry.getName().contains("field_")) {
+                    boolean promoteRecordComponent = c.getRecordComponent(f.getKey()) != null;
+                    if (findEntry.getName().startsWith("field_") || (promoteRecordComponent && findEntry.getName().startsWith("comp_"))) {
                         return findEntry.getName();
                     } else {
-                        String newName = next(f, "field");
+                        String newName = next(f, promoteRecordComponent ? "comp" : "field");
                         System.out.println(findEntry.getName() + " is now " + newName);
                         return newName;
                     }
@@ -357,17 +359,19 @@ class GenState {
                 for (JarMethodEntry mm : allEntries) {
                     methodNames.put(mm, s);
                 }
-                if (s.contains("method_")) {
+                boolean promoteRecordComponent = m.isRecordComponentGetter();
+                if (s.startsWith("method_") || (promoteRecordComponent && s.startsWith("comp_"))) {
                     return s;
                 } else {
-                    String newName = next(m, "method");
+                    String newName = next(m, promoteRecordComponent ? "comp" : "method");
                     System.out.println(s + " is now " + newName);
                     return newName;
                 }
             }
         }
 
-        return next(m, "method");
+        boolean promoteRecordComponent = m.isRecordComponentGetter();
+        return next(m, promoteRecordComponent ? "comp" : "method");
     }
 
     private void addClass(BufferedWriter writer, JarClassEntry c, ClassStorage storageOld, ClassStorage storage, String translatedPrefix) throws IOException {

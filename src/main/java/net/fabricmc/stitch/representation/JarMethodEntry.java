@@ -24,6 +24,7 @@ import java.util.*;
 public class JarMethodEntry extends AbstractJarEntry {
     protected String desc;
     protected String signature;
+    protected boolean isRecordComponentGetter;
 
     protected JarMethodEntry(int access, String name, String desc, String signature) {
         super(name);
@@ -41,8 +42,12 @@ public class JarMethodEntry extends AbstractJarEntry {
     }
 
     @Override
-    protected String getKey() {
+    public String getKey() {
         return super.getKey() + desc;
+    }
+
+    public boolean isRecordComponentGetter() {
+        return this.isRecordComponentGetter;
     }
 
     public boolean isSource(ClassStorage storage, JarClassEntry c) {

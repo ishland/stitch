@@ -56,11 +56,11 @@ public class GenMap {
         }
 
         for (FieldEntry fieldEntry : mappings.getFieldEntries()) {
-            map.get(fieldEntry.get(from).getOwner()).fieldMaps.put(fieldEntry.get(from), fieldEntry.get(to));
+            map.computeIfAbsent(fieldEntry.get(from).getOwner(), Class::new).fieldMaps.put(fieldEntry.get(from), fieldEntry.get(to));
         }
 
         for (MethodEntry methodEntry : mappings.getMethodEntries()) {
-            map.get(methodEntry.get(from).getOwner()).methodMaps.put(methodEntry.get(from), methodEntry.get(to));
+            map.computeIfAbsent(methodEntry.get(from).getOwner(), Class::new).methodMaps.put(methodEntry.get(from), methodEntry.get(to));
         }
     }
     
