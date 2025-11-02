@@ -25,6 +25,7 @@ public class JarMethodEntry extends AbstractJarEntry {
     protected String desc;
     protected String signature;
     protected JarRecordComponentEntry recordComponent;
+    protected boolean isNonObfuscated;
 
     protected JarMethodEntry(int access, String name, String desc, String signature) {
         super(name);
@@ -54,6 +55,10 @@ public class JarMethodEntry extends AbstractJarEntry {
         return this.recordComponent;
     }
 
+    public boolean isAbsolutelyNonObfuscated() {
+        return this.isNonObfuscated;
+    }
+
     public boolean isSource(ClassStorage storage, JarClassEntry c) {
         if (Access.isPrivateOrStatic(getAccess())) {
             return true;
@@ -66,6 +71,10 @@ public class JarMethodEntry extends AbstractJarEntry {
     }
 
     public List<JarClassEntry> getMatchingEntries(ClassStorage storage, JarClassEntry c) {
+        return this.getMatchingEntries(storage, c, false);
+    }
+
+    public List<JarClassEntry> getMatchingEntries(ClassStorage storage, JarClassEntry c, boolean returnOnNonObfuscated) {
         if (Access.isPrivateOrStatic(getAccess())) {
             return Collections.singletonList(c);
         }
@@ -75,16 +84,25 @@ public class JarMethodEntry extends AbstractJarEntry {
         entries.add(c);
         int lastSize = 0;
 
+        outer_loop:
         while (entries.size() > lastSize) {
             lastSize = entries.size();
 
             for (JarClassEntry cc : entries) {
+                if (returnOnNonObfuscated) {
+                    JarMethodEntry method = cc.getMethod(this.getKey());
+                    if (method != null && method.isNonObfuscated) break outer_loop;
+                }
                 getMatchingSources(entriesNew, storage, cc);
             }
             entries.addAll(entriesNew);
             entriesNew.clear();
 
             for (JarClassEntry cc : entries) {
+                if (returnOnNonObfuscated) {
+                    JarMethodEntry method = cc.getMethod(this.getKey());
+                    if (method != null && method.isNonObfuscated) break outer_loop;
+                }
                 getMatchingEntries(entriesNew, storage, cc, 0);
             }
             entries.addAll(entriesNew);

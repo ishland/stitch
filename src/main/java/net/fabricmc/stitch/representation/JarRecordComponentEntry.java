@@ -22,6 +22,7 @@ import org.objectweb.asm.commons.Remapper;
 public class JarRecordComponentEntry extends AbstractJarEntry {
     protected String desc;
     protected String signature;
+    protected boolean isNonObfuscated;
 
     JarRecordComponentEntry(String name, String desc, String signature) {
         super(name);

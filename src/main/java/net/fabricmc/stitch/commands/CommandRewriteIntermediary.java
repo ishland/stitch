@@ -31,12 +31,12 @@ public class CommandRewriteIntermediary extends Command {
 
     @Override
     public String getHelpString() {
-        return "<jar> <old-mapping-file> <new-mapping-file> [--writeAll]";
+        return "<jar> <jar-classpath> <old-mapping-file> <new-mapping-file> [--writeAll]";
     }
 
     @Override
     public boolean isArgumentCountValid(int count) {
-        return count >= 3;
+        return count >= 4;
     }
 
     @Override
@@ -44,7 +44,7 @@ public class CommandRewriteIntermediary extends Command {
         File fileOld = new File(args[0]);
         JarRootEntry jarOld = new JarRootEntry(fileOld);
         try {
-            JarReader reader = new JarReader(jarOld);
+            JarReader reader = new JarReader(jarOld, new File(args[1]));
             reader.apply();
         } catch (IOException e) {
             e.printStackTrace();
@@ -61,9 +61,9 @@ public class CommandRewriteIntermediary extends Command {
         }
 
         System.err.println("Loading mapping file...");
-        state.prepareRewrite(new File(args[1]));
+        state.prepareRewrite(new File(args[2]));
 
-        File outFile = new File(args[2]);
+        File outFile = new File(args[3]);
         if (outFile.exists()) {
             outFile.delete();
         }

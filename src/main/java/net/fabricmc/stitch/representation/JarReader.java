@@ -19,60 +19,72 @@ package net.fabricmc.stitch.representation;
 import net.fabricmc.stitch.util.StitchUtil;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.Remapper;
-import org.objectweb.asm.tree.MethodNode;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.*;
 import java.util.jar.JarInputStream;
 
 public class JarReader {
-    public static class Builder {
-        private final JarReader reader;
-
-        private Builder(JarReader reader) {
-            this.reader = reader;
-        }
-
-        public static Builder create(JarRootEntry jar) {
-            return new Builder(new JarReader(jar));
-        }
-
-        public Builder joinMethodEntries(boolean value) {
-            reader.joinMethodEntries = value;
-            return this;
-        }
-
-        public Builder withRemapper(Remapper remapper) {
-            reader.remapper = remapper;
-            return this;
-        }
-
-        public JarReader build() {
-            return reader;
-        }
-    }
+//    public static class Builder {
+//        private final JarReader reader;
+//
+//        private Builder(JarReader reader) {
+//            this.reader = reader;
+//        }
+//
+//        public static Builder create(JarRootEntry jar) {
+//            return new Builder(new JarReader(jar));
+//        }
+//
+//        public Builder joinMethodEntries(boolean value) {
+//            reader.joinMethodEntries = value;
+//            return this;
+//        }
+//
+//        public Builder withRemapper(Remapper remapper) {
+//            reader.remapper = remapper;
+//            return this;
+//        }
+//
+//        public JarReader build() {
+//            return reader;
+//        }
+//    }
 
     private final JarRootEntry jar;
+    private final File classpathDir;
+    private final LazyClasspathStorage lazyClasspathStorage;
     private boolean joinMethodEntries = true;
     private Remapper remapper;
 
-    public JarReader(JarRootEntry jar) {
+    public JarReader(JarRootEntry jar, File classpathDir) {
         this.jar = jar;
+        this.classpathDir = classpathDir;
+        this.lazyClasspathStorage = new LazyClasspathStorage(this.jar, this.classpathDir);
     }
 
     private class VisitorClass extends ClassVisitor {
         private JarClassEntry entry;
+        private final boolean isNonObfuscated;
+        private final ClassStorage backing;
 
-        public VisitorClass(int api, ClassVisitor classVisitor) {
+        public VisitorClass(int api, ClassVisitor classVisitor, boolean isNonObfuscated, ClassStorage backing) {
             super(api, classVisitor);
+            this.isNonObfuscated = isNonObfuscated;
+            this.backing = backing;
         }
 
         @Override
         public void visit(final int version, final int access, final String name, final String signature,
                           final String superName, final String[] interfaces) {
-            this.entry = jar.getClass(name, true);
-            this.entry.populate(access, signature, superName, interfaces);
+            this.entry = backing.getClass(name, true);
+            this.entry.populate(access, signature, superName, interfaces, this.isNonObfuscated);
 
             super.visit(version, access, name, signature, superName, interfaces);
         }
@@ -83,6 +95,7 @@ public class JarReader {
             JarFieldEntry field = new JarFieldEntry(access, name, descriptor, signature);
             this.entry.fields.put(field.getKey(), field);
             field.recordComponent = this.entry.getRecordComponent(field.getKey());
+            field.isNonObfuscated = this.isNonObfuscated;
 
             return new VisitorField(api, super.visitField(access, name, descriptor, signature, value),
                     entry, field);
@@ -93,6 +106,7 @@ public class JarReader {
                                          final String signature, final String[] exceptions) {
             JarMethodEntry method = new JarMethodEntry(access, name, descriptor, signature);
             this.entry.methods.put(method.getKey(), method);
+            method.isNonObfuscated = this.isNonObfuscated;
 
             return new VisitorMethod(api, super.visitMethod(access, name, descriptor, signature, exceptions),
                     entry, method);
@@ -102,6 +116,7 @@ public class JarReader {
         public RecordComponentVisitor visitRecordComponent(String name, String descriptor, String signature) {
             JarRecordComponentEntry recordComponent = new JarRecordComponentEntry(name, descriptor, signature);
             this.entry.recordComponents.put(recordComponent.getKey(), recordComponent);
+            recordComponent.isNonObfuscated = this.isNonObfuscated;
 
             return new VisitorRecordComponent(api, super.visitRecordComponent(name, descriptor, signature), entry, recordComponent);
         }
@@ -425,7 +440,7 @@ public class JarReader {
                     }
 
                     ClassReader reader = new ClassReader(jarStream);
-                    ClassVisitor visitor = new VisitorClass(StitchUtil.ASM_VERSION, null);
+                    ClassVisitor visitor = new VisitorClass(StitchUtil.ASM_VERSION, null, false, jar);
                     reader.accept(visitor, ClassReader.SKIP_FRAMES);
                 }
             }
@@ -434,7 +449,7 @@ public class JarReader {
         System.err.println("Read " + this.jar.getAllClasses().size() + " (" + this.jar.getClasses().size() + ") classes.");
 
         // Stage 2: find subclasses
-        this.jar.getAllClasses().forEach((c) -> c.populateParents(jar));
+        this.jar.getAllClasses().forEach((c) -> c.populateParents(this.lazyClasspathStorage));
         System.err.println("Populated subclass entries.");
 
         // Stage 3: join identical MethodEntries
@@ -452,7 +467,7 @@ public class JarReader {
                     continue;
                 }
 
-                ClassPropagationTree tree = new ClassPropagationTree(jar, entry);
+                ClassPropagationTree tree = new ClassPropagationTree(this.lazyClasspathStorage, entry);
                 if (tree.getClasses().size() == 1) {
                     traversedClasses.add(entry);
                     continue;
@@ -465,20 +480,29 @@ public class JarReader {
                         }
 
                         // get all matching entries
-                        List<JarClassEntry> mList = m.getMatchingEntries(jar, c);
+                        List<JarClassEntry> mList = m.getMatchingEntries(this.lazyClasspathStorage, c, true);
 
                         if (mList.size() > 1) {
-                            for (int i = 0; i < mList.size(); i++) {
-                                JarClassEntry key = mList.get(i);
+                            boolean hasNonObfuscated = false;
+                            for (JarClassEntry key : mList) {
                                 JarMethodEntry value = key.getMethod(m.getKey());
-                                if (value != m) {
-                                    key.methods.put(m.getKey(), m);
-                                    if (m.recordComponent == null) {
-                                        m.recordComponent = value.recordComponent;
-                                    } else {
-                                        System.out.println(String.format("Merging %s/%s into %s/%s", key.getFullyQualifiedName(), value.getKey(), c.getFullyQualifiedName(), m.getKey()));
+                                hasNonObfuscated |= value.isNonObfuscated;
+                            }
+                            if (hasNonObfuscated) {
+                                for (JarClassEntry key : mList) {
+                                    JarMethodEntry value = key.getMethod(m.getKey());
+                                    value.isNonObfuscated = true;
+                                }
+                            } else {
+                                for (JarClassEntry key : mList) {
+                                    JarMethodEntry value = key.getMethod(m.getKey());
+                                    if (value != m) {
+                                        key.methods.put(m.getKey(), m);
+                                        if (m.recordComponent == null) {
+                                            m.recordComponent = value.recordComponent;
+                                        }
+                                        joinedMethods++;
                                     }
-                                    joinedMethods++;
                                 }
                             }
                         }
@@ -523,5 +547,58 @@ public class JarReader {
         }
 
         System.err.println("- Done. -");
+    }
+
+    class LazyClasspathStorage implements ClassStorage {
+        private final ClassStorage delegate;
+        private final URLClassLoader classpath;
+        private final JarRootEntry classpathCache = new JarRootEntry();
+
+        public LazyClasspathStorage(ClassStorage delegate, File classpathDir) {
+            this.delegate = delegate;
+            List<URL> urls = new ArrayList<>();
+            File[] files = classpathDir.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    try {
+                        urls.add(file.toURI().toURL());
+                    } catch (MalformedURLException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+            this.classpath = new URLClassLoader(urls.toArray(URL[]::new));
+        }
+
+        @Override
+        public JarClassEntry getClass(String name, boolean create) {
+            if (create) {
+                throw new UnsupportedOperationException();
+            }
+            JarClassEntry entry = this.delegate.getClass(name, false);
+            if (entry != null) {
+                return entry;
+            }
+            entry = this.classpathCache.getClass(name, false);
+            if (entry != null) {
+                return entry;
+            }
+            try (InputStream resourceAsStream = this.classpath.getResourceAsStream(name + ".class")) {
+                if (resourceAsStream == null) {
+                    System.out.println("%s not found from classpath".formatted(name));
+                    return null;
+                }
+//                System.out.println("Loading %s from classpath".formatted(name));
+                ClassReader reader = new ClassReader(resourceAsStream);
+                VisitorClass visitor = new VisitorClass(StitchUtil.ASM_VERSION, null, true, this.classpathCache);
+                reader.accept(visitor, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+                JarClassEntry entry1 = visitor.entry;
+                entry1.populateParents(this);
+                return entry1;
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
     }
 }

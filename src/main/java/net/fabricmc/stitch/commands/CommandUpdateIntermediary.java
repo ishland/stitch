@@ -30,12 +30,12 @@ public class CommandUpdateIntermediary extends Command {
 
     @Override
     public String getHelpString() {
-        return "<old-jar> <new-jar> <old-mapping-file> <new-mapping-file> <match-file> [-t|--target-namespace <namespace>] [-p|--non-obfuscation-pattern <regex pattern>] [-c|--conflicts <conflict choices>]";
+        return "<old-jar> <old-jar-classpath> <new-jar> <new-jar-classpath> <old-mapping-file> <new-mapping-file> <match-file> [-t|--target-namespace <namespace>] [-p|--non-obfuscation-pattern <regex pattern>] [-c|--conflicts <conflict choices>]";
     }
 
     @Override
     public boolean isArgumentCountValid(int count) {
-        return count >= 5;
+        return count >= 7;
     }
 
     @Override
@@ -43,16 +43,16 @@ public class CommandUpdateIntermediary extends Command {
         File fileOld = new File(args[0]);
         JarRootEntry jarOld = new JarRootEntry(fileOld);
         try {
-            JarReader reader = new JarReader(jarOld);
+            JarReader reader = new JarReader(jarOld, new File(args[1]));
             reader.apply();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        File fileNew = new File(args[1]);
+        File fileNew = new File(args[2]);
         JarRootEntry jarNew = new JarRootEntry(fileNew);
         try {
-            JarReader reader = new JarReader(jarNew);
+            JarReader reader = new JarReader(jarNew, new File(args[3]));
             reader.apply();
         } catch (IOException e) {
             e.printStackTrace();
@@ -61,7 +61,7 @@ public class CommandUpdateIntermediary extends Command {
         GenState state = new GenState();
         boolean clearedPatterns = false;
 
-        for (int i = 5; i < args.length; i++) {
+        for (int i = 7; i < args.length; i++) {
             switch (args[i].toLowerCase(Locale.ROOT)) {
                 case "-t":
                 case "--target-namespace":
@@ -85,10 +85,10 @@ public class CommandUpdateIntermediary extends Command {
         }
 
         System.err.println("Loading remapping files...");
-        state.prepareUpdate(new File(args[2]), new File(args[4]));
+        state.prepareUpdate(new File(args[4]), new File(args[6]));
 
         System.err.println("Generating new mappings...");
-        state.generate(new File(args[3]), jarNew, jarOld);
+        state.generate(new File(args[5]), jarNew, jarOld);
         System.err.println("Done!");
     }
 

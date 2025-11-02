@@ -22,6 +22,7 @@ public class JarFieldEntry extends AbstractJarEntry {
     protected String desc;
     protected String signature;
     protected JarRecordComponentEntry recordComponent;
+    protected boolean isNonObfuscated;
 
     JarFieldEntry(int access, String name, String desc, String signature) {
         super(name);

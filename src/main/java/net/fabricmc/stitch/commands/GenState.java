@@ -153,6 +153,9 @@ class GenState {
     }
 
     public boolean isObfuscatedMethod(ClassStorage storage, JarClassEntry c, JarMethodEntry m) {
+        if (m.isAbsolutelyNonObfuscated()) {
+            return false;
+        }
         boolean isEnum = (c.getAccess() & Opcodes.ACC_ENUM) != 0;
         String patternInput = c.getFullyQualifiedName() + "/" + m.getKey();
         return !m.getName().equals("<clinit>")

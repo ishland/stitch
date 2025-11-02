@@ -29,12 +29,12 @@ public class CommandGenerateIntermediary extends Command {
 
     @Override
     public String getHelpString() {
-        return "<input-jar> <mapping-name> [-t|--target-namespace <namespace>] [-p|--non-obfuscation-pattern <regex pattern>]...";
+        return "<input-jar> <input-classpath> <mapping-name> [-t|--target-namespace <namespace>] [-p|--non-obfuscation-pattern <regex pattern>]...";
     }
 
     @Override
     public boolean isArgumentCountValid(int count) {
-        return count >= 2;
+        return count >= 3;
     }
 
     @Override
@@ -42,7 +42,7 @@ public class CommandGenerateIntermediary extends Command {
         File file = new File(args[0]);
         JarRootEntry jarEntry = new JarRootEntry(file);
         try {
-            JarReader reader = new JarReader(jarEntry);
+            JarReader reader = new JarReader(jarEntry, new File(args[1]));
             reader.apply();
         } catch (IOException e) {
             e.printStackTrace();
@@ -51,7 +51,7 @@ public class CommandGenerateIntermediary extends Command {
         GenState state = new GenState();
         boolean clearedPatterns = false;
 
-        for (int i = 2; i < args.length; i++) {
+        for (int i = 3; i < args.length; i++) {
             switch (args[i].toLowerCase(Locale.ROOT)) {
                 case "-t":
                 case "--target-namespace":
@@ -71,7 +71,7 @@ public class CommandGenerateIntermediary extends Command {
         }
 
         System.err.println("Generating new mappings...");
-        state.generate(new File(args[1]), jarEntry, null);
+        state.generate(new File(args[2]), jarEntry, null);
         System.err.println("Done!");
     }
 }
