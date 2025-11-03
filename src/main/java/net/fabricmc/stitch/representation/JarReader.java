@@ -16,6 +16,7 @@
 
 package net.fabricmc.stitch.representation;
 
+import net.fabricmc.stitch.util.Pair;
 import net.fabricmc.stitch.util.StitchUtil;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.Remapper;
@@ -62,6 +63,7 @@ public class JarReader {
     private final LazyClasspathStorage lazyClasspathStorage;
     private boolean joinMethodEntries = true;
     private Remapper remapper;
+    private final Set<Pair<String, String>> functionalInterfaceMethods = new HashSet<>();
 
     public JarReader(JarRootEntry jar, File classpathDir) {
         this.jar = jar;
@@ -71,7 +73,7 @@ public class JarReader {
 
     private class VisitorClass extends ClassVisitor {
         private JarClassEntry entry;
-        private final boolean isNonObfuscated;
+        private boolean isNonObfuscated;
         private final ClassStorage backing;
 
         public VisitorClass(int api, ClassVisitor classVisitor, boolean isNonObfuscated, ClassStorage backing) {
@@ -87,6 +89,11 @@ public class JarReader {
             this.entry.populate(access, signature, superName, interfaces, this.isNonObfuscated);
 
             super.visit(version, access, name, signature, superName, interfaces);
+        }
+
+        @Override
+        public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+            return super.visitAnnotation(descriptor, visible);
         }
 
         @Override
@@ -350,6 +357,16 @@ public class JarReader {
         @Override
         public void visitInvokeDynamicInsn(String name, String descriptor, Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
             this.failRecordMatching();
+            if (bootstrapMethodHandle.getOwner().equals("java/lang/invoke/LambdaMetafactory") &&
+                bootstrapMethodHandle.getName().equals("metafactory") &&
+                bootstrapMethodHandle.getDesc().equals("(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;") &&
+                !bootstrapMethodHandle.isInterface()) {
+                // lambda implementation
+                Type functionalInterfaceType = Type.getReturnType(descriptor);
+                String functionalInterfaceMethodName = name;
+                String functionalInterfaceMethodDescriptor = ((Type) bootstrapMethodArguments[0]).getDescriptor();
+                functionalInterfaceMethods.add(Pair.of(functionalInterfaceType.getInternalName(), functionalInterfaceMethodName + functionalInterfaceMethodDescriptor));
+            }
             super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
         }
 
@@ -451,6 +468,19 @@ public class JarReader {
         // Stage 2: find subclasses
         this.jar.getAllClasses().forEach((c) -> c.populateParents(this.lazyClasspathStorage));
         System.err.println("Populated subclass entries.");
+
+        for (Pair<String, String> pair : this.functionalInterfaceMethods) {
+            String className = pair.getLeft();
+            String methodKey = pair.getRight();
+            JarClassEntry classEntry = this.lazyClasspathStorage.getClass(className, false);
+            JarMethodEntry method = classEntry.getMethod(methodKey);
+            if (method == null) {
+                System.out.println(String.format("Functional interface %s;%s not found", className, methodKey));
+                continue;
+            }
+            System.out.println(String.format("Marking functional interface %s;%s unobfuscated", className, methodKey));
+            method.isNonObfuscated = true;
+        }
 
         // Stage 3: join identical MethodEntries
         if (joinMethodEntries) {
