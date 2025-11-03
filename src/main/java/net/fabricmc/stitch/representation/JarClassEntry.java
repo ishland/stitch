@@ -30,6 +30,7 @@ public class JarClassEntry extends AbstractJarEntry {
     final Map<String, JarMethodEntry> methods;
     final Map<String, Set<Pair<JarClassEntry, String>>> relatedMethods;
 
+    boolean populated;
     boolean isNonObfuscated;
     String signature;
     String superclass;
@@ -49,6 +50,7 @@ public class JarClassEntry extends AbstractJarEntry {
 
         this.subclasses = new ArrayList<>();
         this.implementers = new ArrayList<>();
+        this.populated = false;
     }
 
     protected void populate(int access, String signature, String superclass, String[] interfaces, boolean isNonObfuscated) {
@@ -57,6 +59,7 @@ public class JarClassEntry extends AbstractJarEntry {
         this.superclass = superclass;
         this.interfaces = Arrays.asList(interfaces);
         this.isNonObfuscated = isNonObfuscated;
+        this.populated = true;
     }
 
     protected void populateParents(ClassStorage storage) {

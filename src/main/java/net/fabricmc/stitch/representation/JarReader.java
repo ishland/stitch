@@ -610,7 +610,7 @@ public class JarReader {
                 return entry;
             }
             entry = this.classpathCache.getClass(name, false);
-            if (entry != null) {
+            if (entry != null && entry.populated) {
                 return entry;
             }
             try (InputStream resourceAsStream = this.classpath.getResourceAsStream(name + ".class")) {
@@ -621,7 +621,7 @@ public class JarReader {
 //                System.out.println("Loading %s from classpath".formatted(name));
                 ClassReader reader = new ClassReader(resourceAsStream);
                 VisitorClass visitor = new VisitorClass(StitchUtil.ASM_VERSION, null, true, this.classpathCache);
-                reader.accept(visitor, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+                reader.accept(visitor, ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES);
                 JarClassEntry entry1 = visitor.entry;
                 entry1.populateParents(this);
                 return entry1;
