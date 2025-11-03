@@ -75,6 +75,8 @@ public class JarReader {
         private JarClassEntry entry;
         private boolean isNonObfuscated;
         private final ClassStorage backing;
+        private List<JarRecordComponentEntry> orderedRecordComponent;
+        private int readingRecordComponentIndex = -1;
 
         public VisitorClass(int api, ClassVisitor classVisitor, boolean isNonObfuscated, ClassStorage backing) {
             super(api, classVisitor);
@@ -87,6 +89,9 @@ public class JarReader {
                           final String superName, final String[] interfaces) {
             this.entry = backing.getClass(name, true);
             this.entry.populate(access, signature, superName, interfaces, this.isNonObfuscated);
+
+            this.orderedRecordComponent = new ArrayList<>();
+            this.readingRecordComponentIndex = -3; // toString, hashCode, equals
 
             super.visit(version, access, name, signature, superName, interfaces);
         }
@@ -115,8 +120,26 @@ public class JarReader {
             this.entry.methods.put(method.getKey(), method);
             method.isNonObfuscated = this.isNonObfuscated;
 
+            int index;
+            if (this.readingRecordComponentIndex >= 0) {
+                index = this.readingRecordComponentIndex++;
+            } else {
+                index = -1;
+            }
+
+            // order these after index fetch
+            if ("java/lang/Record".equals(this.entry.superclass)) {
+                if (name.equals("toString") && descriptor.equals("()Ljava/lang/String;")) {
+                    this.readingRecordComponentIndex ++;
+                } else if (name.equals("equals") && descriptor.equals("(Ljava/lang/Object;)Z")) {
+                    this.readingRecordComponentIndex ++;
+                } else if (name.equals("hashCode") && descriptor.equals("()I")) {
+                    this.readingRecordComponentIndex ++;
+                }
+            }
+
             return new VisitorMethod(api, super.visitMethod(access, name, descriptor, signature, exceptions),
-                    entry, method);
+                    entry, method, index, this.orderedRecordComponent);
         }
 
         @Override
@@ -124,8 +147,40 @@ public class JarReader {
             JarRecordComponentEntry recordComponent = new JarRecordComponentEntry(name, descriptor, signature);
             this.entry.recordComponents.put(recordComponent.getKey(), recordComponent);
             recordComponent.isNonObfuscated = this.isNonObfuscated;
+            this.orderedRecordComponent.add(recordComponent);
 
             return new VisitorRecordComponent(api, super.visitRecordComponent(name, descriptor, signature), entry, recordComponent);
+        }
+
+        @Override
+        public void visitEnd() {
+            Set<JarRecordComponentEntry> recordComponentEntries = StitchUtil.newIdentityHashSet();
+            recordComponentEntries.addAll(this.entry.recordComponents.values());
+            for (JarMethodEntry methodEntry : this.entry.methods.values()) {
+                if (methodEntry.recordComponent != null) {
+                    if (!recordComponentEntries.remove(methodEntry.recordComponent)) {
+                        System.out.println(String.format("Duplicate assignment for record component %s;%s", this.entry.getFullyQualifiedName(), methodEntry.recordComponent.getKey()));
+                    }
+                }
+            }
+            outer_loop:
+            for (Iterator<JarRecordComponentEntry> iterator = recordComponentEntries.iterator(); iterator.hasNext(); ) {
+                JarRecordComponentEntry unassignedEntry = iterator.next();
+                for (JarMethodEntry methodEntry : this.entry.methods.values()) {
+                    if (methodEntry.recordComponent == null && methodEntry.desc.startsWith("()") && Type.getReturnType(methodEntry.desc).getDescriptor().equals(unassignedEntry.desc) &&
+                            ((methodEntry.access & 0xffff) == Opcodes.ACC_PUBLIC || (methodEntry.access & 0xffff) == (Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL))) {
+                        System.out.println(String.format("Promoting %s;%s as record getter for %s", this.entry.getFullyQualifiedName(), methodEntry.getKey(), unassignedEntry.getKey()));
+                        methodEntry.recordComponent = unassignedEntry;
+                        iterator.remove();
+                        continue outer_loop;
+                    }
+                }
+            }
+            if (!recordComponentEntries.isEmpty()) {
+                System.out.println(String.format("Record %s still have %d unclaimed record getters", this.entry.getFullyQualifiedName(), recordComponentEntries.size()));
+            }
+
+            super.visitEnd();
         }
     }
 
@@ -196,7 +251,7 @@ public class JarReader {
         private final List<MethodRef> methodRefs = new ArrayList<>();
 
         public VisitorBridge(int api, int access, MethodVisitor methodVisitor, JarClassEntry classEntry, JarMethodEntry entry) {
-            super(api, methodVisitor, classEntry, entry);
+            super(api, methodVisitor, classEntry, entry, -1, null);
             hasBridgeFlag = ((access & Opcodes.ACC_BRIDGE) != 0);
         }
 
@@ -235,11 +290,15 @@ public class JarReader {
     private class VisitorMethod extends MethodVisitor {
         final JarClassEntry classEntry;
         final JarMethodEntry entry;
+        final int readingRecordComponentIndex;
+        private final List<JarRecordComponentEntry> orderedRecordComponent;
 
-        public VisitorMethod(int api, MethodVisitor methodVisitor, JarClassEntry classEntry, JarMethodEntry entry) {
+        public VisitorMethod(int api, MethodVisitor methodVisitor, JarClassEntry classEntry, JarMethodEntry entry, int readingRecordComponentIndex, List<JarRecordComponentEntry> orderedRecordComponent) {
             super(api, methodVisitor);
             this.classEntry = classEntry;
             this.entry = entry;
+            this.readingRecordComponentIndex = readingRecordComponentIndex;
+            this.orderedRecordComponent = orderedRecordComponent;
             this.recordMethodMatchingState = RecordMethodMatchingState.NOT_STARTED;
             if (!entry.desc.startsWith("()")) {
                 this.recordMethodMatchingState = RecordMethodMatchingState.FAIL;
@@ -324,9 +383,29 @@ public class JarReader {
 
         @Override
         public void visitEnd() {
+            int index = this.readingRecordComponentIndex;
             if (recordMethodMatchingState == RecordMethodMatchingState.SUCCESS) {
-                this.entry.recordComponent = this.recordComponentEntry;
+                if (index >= 0) {
+//                    if (index >= this.orderedRecordComponent.size() || this.orderedRecordComponent.get(index) != this.recordComponentEntry) {
+//                        System.out.println(String.format("Suspicious getter %s;%s : field expected %s but got %s", this.classEntry.getFullyQualifiedName(), this.entry.getKey(), this.orderedRecordComponent.get(index), this.recordComponentEntry));
+//                    }
+                    this.entry.recordComponent = this.recordComponentEntry;
+                } else {
+                    System.out.println(String.format("Demoting record getter %s;%s", this.classEntry.getFullyQualifiedName(), this.entry.getKey()));
+                }
             }
+//            else {
+//                if (index >= 0) {
+//                    String typeDescriptor = Type.getReturnType(this.entry.desc).getDescriptor();
+//                    JarRecordComponentEntry entry = index < this.orderedRecordComponent.size() ? this.orderedRecordComponent.get(index) : null;
+//                    if (entry != null && this.entry.desc.startsWith("()") && typeDescriptor.equals(entry.desc)) {
+//                        System.out.println(String.format("Promoting possibly overridden record getter: %s;%s", this.classEntry.getFullyQualifiedName(), this.entry.getKey()));
+//                        this.entry.recordComponent = entry;
+//                    } else if (index < this.orderedRecordComponent.size()) { // <clinit> and other synthetics can exist after this
+//                        System.out.println(String.format("Suspicious method in record getters ordering: %s;%s", this.classEntry.getFullyQualifiedName(), this.entry.getKey()));
+//                    }
+//                }
+//            }
             super.visitEnd();
         }
 
@@ -478,7 +557,7 @@ public class JarReader {
                 System.out.println(String.format("Functional interface %s;%s not found", className, methodKey));
                 continue;
             }
-            System.out.println(String.format("Marking functional interface %s;%s unobfuscated", className, methodKey));
+//            System.out.println(String.format("Marking functional interface %s;%s unobfuscated", className, methodKey));
             method.isNonObfuscated = true;
         }
 
