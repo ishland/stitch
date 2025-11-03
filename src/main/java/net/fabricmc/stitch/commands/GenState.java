@@ -188,7 +188,7 @@ class GenState {
             EntryTriple findEntry = newToIntermediary.getField(c.getFullyQualifiedName(), f.getName(), f.getDescriptor());
             if (findEntry != null) {
                 boolean promoteRecordComponent = recordComponent != null;
-                if (findEntry.getName().startsWith("field_") || (promoteRecordComponent && findEntry.getName().startsWith("comp_"))) {
+                if (promoteRecordComponent ? findEntry.getName().startsWith("comp_") : findEntry.getName().startsWith("field_")) {
                     if (promoteRecordComponent) {
                         this.recordComponentNames.put(recordComponent, findEntry.getName());
                     }
@@ -210,7 +210,7 @@ class GenState {
                 findEntry = oldToIntermediary.getField(findEntry);
                 if (findEntry != null) {
                     boolean promoteRecordComponent = recordComponent != null;
-                    if (findEntry.getName().startsWith("field_") || (promoteRecordComponent && findEntry.getName().startsWith("comp_"))) {
+                    if (promoteRecordComponent ? findEntry.getName().startsWith("comp_") : findEntry.getName().startsWith("field_")) {
                         if (promoteRecordComponent) {
                             this.recordComponentNames.put(recordComponent, findEntry.getName());
                         }
@@ -407,7 +407,7 @@ class GenState {
                     methodNames.put(mm, s);
                 }
                 boolean promoteRecordComponent = recordComponent != null;
-                if (s.startsWith("method_") || (promoteRecordComponent && s.startsWith("comp_"))) {
+                if (promoteRecordComponent ? s.startsWith("comp_") : s.startsWith("method_")) {
                     if (promoteRecordComponent) {
                         recordComponentNames.put(recordComponent, s);
                     }
