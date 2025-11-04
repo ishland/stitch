@@ -166,9 +166,15 @@ public class JarReader {
             outer_loop:
             for (Iterator<JarRecordComponentEntry> iterator = recordComponentEntries.iterator(); iterator.hasNext(); ) {
                 JarRecordComponentEntry unassignedEntry = iterator.next();
+                JarFieldEntry field = this.entry.getField(unassignedEntry.getKey());
+                if (field == null) {
+                    System.out.println(String.format("Dangling record component %s in class %s", unassignedEntry.getKey(), this.entry.getFullyQualifiedName()));
+                    continue outer_loop;
+                }
                 for (JarMethodEntry methodEntry : this.entry.methods.values()) {
                     if (methodEntry.recordComponent == null && methodEntry.desc.startsWith("()") && Type.getReturnType(methodEntry.desc).getDescriptor().equals(unassignedEntry.desc) &&
-                            ((methodEntry.access & 0xffff) == Opcodes.ACC_PUBLIC || (methodEntry.access & 0xffff) == (Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL))) {
+                            ((methodEntry.access & 0xffff) == Opcodes.ACC_PUBLIC || (methodEntry.access & 0xffff) == (Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL)) &&
+                            methodEntry.referencedSelfFields.contains(field)) {
                         System.out.println(String.format("Promoting %s;%s as record getter for %s", this.entry.getFullyQualifiedName(), methodEntry.getKey(), unassignedEntry.getKey()));
                         methodEntry.recordComponent = unassignedEntry;
                         iterator.remove();
@@ -349,6 +355,13 @@ public class JarReader {
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
             super.visitFieldInsn(opcode, owner, name, descriptor);
+            if (opcode == Opcodes.GETFIELD && owner.equals(this.classEntry.fullyQualifiedName)) {
+                JarFieldEntry field = this.classEntry.getField(name + descriptor);
+                if (field != null) {
+                    this.entry.referencedSelfFields.add(field);
+                }
+            }
+
             if (recordMethodMatchingState != RecordMethodMatchingState.ALOAD_THIS) {
                 failRecordMatching();
                 return;

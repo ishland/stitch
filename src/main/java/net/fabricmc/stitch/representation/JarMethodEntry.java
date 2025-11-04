@@ -26,6 +26,7 @@ public class JarMethodEntry extends AbstractJarEntry {
     protected String signature;
     protected JarRecordComponentEntry recordComponent;
     protected boolean isNonObfuscated;
+    protected Set<JarFieldEntry> referencedSelfFields = StitchUtil.newIdentityHashSet();
 
     protected JarMethodEntry(int access, String name, String desc, String signature) {
         super(name);
