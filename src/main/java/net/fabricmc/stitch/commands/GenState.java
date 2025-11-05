@@ -80,7 +80,7 @@ class GenState {
     }
 
     public String next(AbstractJarEntry entry, String name) {
-        return name + "_" + values.computeIfAbsent(entry, (e) -> {
+        return name + "_1_" + values.computeIfAbsent(entry, (e) -> {
             String name1 = name;
             if (name1.equals("comp")) {
                 name1 = "component";
