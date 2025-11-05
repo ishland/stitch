@@ -561,18 +561,18 @@ public class JarReader {
         this.jar.getAllClasses().forEach((c) -> c.populateParents(this.lazyClasspathStorage));
         System.err.println("Populated subclass entries.");
 
-        for (Pair<String, String> pair : this.functionalInterfaceMethods) {
-            String className = pair.getLeft();
-            String methodKey = pair.getRight();
-            JarClassEntry classEntry = this.lazyClasspathStorage.getClass(className, false);
-            JarMethodEntry method = classEntry.getMethod(methodKey);
-            if (method == null) {
-                System.out.println(String.format("Functional interface %s;%s not found", className, methodKey));
-                continue;
-            }
-//            System.out.println(String.format("Marking functional interface %s;%s unobfuscated", className, methodKey));
-            method.isNonObfuscated = true;
-        }
+//        for (Pair<String, String> pair : this.functionalInterfaceMethods) {
+//            String className = pair.getLeft();
+//            String methodKey = pair.getRight();
+//            JarClassEntry classEntry = this.lazyClasspathStorage.getClass(className, false);
+//            JarMethodEntry method = classEntry.getMethod(methodKey);
+//            if (method == null) {
+//                System.out.println(String.format("Functional interface %s;%s not found", className, methodKey));
+//                continue;
+//            }
+////            System.out.println(String.format("Marking functional interface %s;%s unobfuscated", className, methodKey));
+//            method.isNonObfuscated = true;
+//        }
 
         // Stage 3: join identical MethodEntries
         if (joinMethodEntries) {
